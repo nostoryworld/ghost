@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GHOST — your private AI friend (demo)</title>
+<style>
+  :root { --bg:#0e0f14; --card:#181a22; --line:#2a2e3d; --txt:#eef0f6; --dim:#9aa0b4; --acc:#8b7bff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+  header { max-width:720px; margin:0 auto; padding:20px 16px 0; }
+  h1 { margin:0 0 4px; font-size:28px; }
+  h1 span { font-size:32px; }
+  .tagline { color:var(--dim); margin:0 0 12px; }
+  .honest { border:1px solid #b98a1e; background:#221d08; color:#f3d98b; border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.5; }
+  .honest b { color:#ffe9a3; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  #chat { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+  .msg { max-width:85%; padding:10px 13px; border-radius:14px; line-height:1.5; font-size:15px; }
+  .msg.user { align-self:flex-end; background:var(--acc); color:#fff; border-bottom-right-radius:4px; }
+  .msg.ghost { align-self:flex-start; background:var(--card); border:1px solid var(--line); border-bottom-left-radius:4px; }
+  .msg.morning { border-color:#b98a1e; }
+  .msg .who { font-size:12px; color:var(--dim); margin-bottom:2px; }
+  .cardbtn { margin-top:8px; background:none; border:1px solid var(--line); color:var(--dim); border-radius:20px; padding:4px 10px; cursor:pointer; font-size:13px; }
+  .cardbtn:hover { color:var(--txt); border-color:var(--acc); }
+  .cardrefusal { margin-top:8px; font-size:13px; color:#f3a3a3; }
+  form#composer { display:flex; gap:8px; }
+  #input { flex:1; padding:12px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--txt); font-size:15px; }
+  button.send { padding:12px 18px; border:0; border-radius:12px; background:var(--acc); color:#fff; font-size:15px; cursor:pointer; }
+  .hint { color:var(--dim); font-size:13px; margin-top:8px; line-height:1.5; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-top:16px; }
+  .panel h2 { margin:0 0 8px; font-size:17px; }
+  .panel p, .panel li { font-size:14px; line-height:1.6; color:#d5d8e2; }
+  .panel .dim { color:var(--dim); }
+  .pill { display:inline-block; font-size:12px; font-weight:700; letter-spacing:.04em; padding:2px 8px; border-radius:20px; background:#3a2f00; color:#f3d98b; border:1px solid #b98a1e; }
+  .pill.live { background:#0d2b1a; color:#8be8b0; border-color:#2e7d4f; }
+  .memline { font-size:14px; margin:4px 0; }
+  .danger { background:none; border:1px solid #7a3a3a; color:#f3a3a3; border-radius:20px; padding:4px 10px; cursor:pointer; font-size:13px; }
+  #cardstage { display:none; margin-top:12px; }
+  #cardstage .sharecard { background:linear-gradient(135deg,#1b1d2e,#241f3d); border:1px solid var(--acc); border-radius:16px; padding:20px; text-align:center; }
+  #cardstage .sharecard .big { font-size:44px; }
+  #cardstage .sharecard blockquote { font-size:18px; line-height:1.5; margin:14px 0; font-style:italic; }
+  #cardstage .sharecard .foot { color:var(--dim); font-size:12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .row button { background:var(--card); border:1px solid var(--line); color:var(--txt); border-radius:20px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  footer { max-width:720px; margin:0 auto; padding:0 16px 28px; color:var(--dim); font-size:13px; line-height:1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>👻</span> GHOST</h1>
+  <p class="tagline">A friendly, witty, secret-keeping AI friend. This demo lives entirely in your browser.</p>
+  <div class="honest"><b>Honest label — frontend-only demo:</b> Ghost's replies are generated locally in your browser with simple rules. There is no wallet connection, no blockchain transaction, no external API call, and no server-side AI here. Anything "onchain" below is a roadmap item, not a live feature.</div>
+</header>
+
+<main>
+  <div id="chat" aria-live="polite"></div>
+
+  <form id="composer">
+    <input id="input" autocomplete="off" placeholder="Talk to Ghost… try “my name is Ada” or “keep this secret: …”" aria-label="Message Ghost">
+    <button class="send" type="submit">Send</button>
+  </form>
+  <p class="hint">Try: <b>my name is …</b> · <b>remember that …</b> · <b>keep this secret: …</b> · <b>what do you remember?</b> · <b>tell me a joke</b> · <b>help</b><br>
+  Secrets are stored only in this browser and are never shown on a share card.</p>
+
+  <div id="cardstage">
+    <div class="sharecard" id="sharecard">
+      <div class="big">👻</div>
+      <blockquote id="cardquote"></blockquote>
+      <div>— Ghost</div>
+      <div class="foot">GHOST demo · quote generated locally in your browser · not an onchain message</div>
+    </div>
+    <div class="row">
+      <button id="dlcard" type="button">⬇ Download card (PNG)</button>
+      <button id="copycard" type="button">📋 Copy quote text</button>
+      <button id="closecard" type="button">✕ Close</button>
+    </div>
+    <p class="hint" id="cardnote"></p>
+  </div>
+
+  <section class="panel" aria-label="Memory">
+    <h2>🧠 Memory <span class="pill live">BROWSER ONLY</span></h2>
+    <p class="dim">Memory lives in your browser for now — mainnet sealed memory pending.</p>
+    <div class="memline" id="memname"></div>
+    <div class="memline" id="memfacts"></div>
+    <div class="memline" id="memsecrets"></div>
+    <div class="memline" id="memhighlights"></div>
+    <div class="row"><button id="clearmem" class="danger" type="button">Forget everything</button></div>
+  </section>
+
+  <section class="panel" aria-label="Roadmap">
+    <h2>🗺️ Roadmap: mainnet activation</h2>
+    <p class="dim">Nothing below is live yet. These activate only after the mainnet launch, pending the RITUAL airdrop claim.</p>
+    <ul>
+      <li><span class="pill">PENDING</span> <b>Scheduler self-wake-ups</b> — Ghost waking itself up on a schedule, without you opening the app.</li>
+      <li><span class="pill">PENDING</span> <b>TEE sealed memory</b> — memory sealed in trusted hardware onchain, instead of this browser's localStorage.</li>
+      <li><span class="pill">PENDING</span> <b>Onchain LLM</b> — Ghost's replies computed onchain instead of by local rules in your browser.</li>
+    </ul>
+    <p class="dim">Until then: local replies, local memory, $0 cost, no wallet, no transactions.</p>
+  </section>
+</main>
+
+<footer>
+  GHOST MVP — public demo. Source: <a href="https://github.com/nostoryworld/ghost" style="color:#b7adff">github.com/nostoryworld/ghost</a> (MIT). No data leaves your device.
+</footer>
+
+<script>
+"use strict";
+/* GHOST brain: 100% local, rule-based. No fetch(), no API keys, no network. */
+var KEY = "ghost-mvp-v1";
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || blank(); }
+  catch (e) { return blank(); }
+}
+function blank() {
+  return { name: "", facts: [], secrets: [], highlights: [], lastDay: "", chat: [] };
+}
+var S = load();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+var chatEl = document.getElementById("chat");
+function partOfDay() {
+  var h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 18) return "afternoon";
+  return "evening";
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function containsSecret(text) {
+  var t = String(text).toLowerCase();
+  return S.secrets.some(function (s) { return s && s.length >= 3 && t.indexOf(s.toLowerCase()) !== -1; });
+}
+function addMsg(who, text, opts) {
+  opts = opts || {};
+  var div = document.createElement("div");
+  div.className = "msg " + (who === "user" ? "user" : "ghost") + (opts.morning ? " morning" : "");
+  if (who === "ghost") {
+    div.innerHTML = '<div class="who">' + (opts.morning ? "☀️ Morning message · " : "") + "👻 Ghost</div>"
+      + "<div>" + esc(text) + "</div>";
+    var btn = document.createElement("button");
+    btn.className = "cardbtn";
+    btn.type = "button";
+    btn.textContent = "🖼️ Make share card";
+    btn.onclick = function () { makeCard(text, div); };
+    div.appendChild(btn);
+  } else {
+    div.textContent = text;
+  }
+  chatEl.appendChild(div);
+  chatEl.scrollIntoView({ block: "end" });
+  return div;
+}
+
+/* --- share card --- */
+var currentQuote = "";
+function makeCard(text, msgDiv) {
+  var stage = document.getElementById("cardstage");
+  var note = document.getElementById("cardnote");
+  if (containsSecret(text)) {
+    var r = document.createElement("div");
+    r.className = "cardrefusal";
+    r.textContent = "I can't card this one — it contains something you marked as a secret, and secrets never leave this chat.";
+    msgDiv.appendChild(r);
+    return;
+  }
+  currentQuote = text;
+  document.getElementById("cardquote").textContent = "“" + text + "”";
+  note.textContent = "Secrets check passed: this quote contains nothing you marked as a secret.";
+  stage.style.display = "block";
+  stage.scrollIntoView({ block: "center" });
+}
+document.getElementById("closecard").onclick = function () {
+  document.getElementById("cardstage").style.display = "none";
+};
+document.getElementById("copycard").onclick = function () {
+  var t = "“" + currentQuote + "” — Ghost (GHOST demo)";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function () {
+      document.getElementById("cardnote").textContent = "Copied to clipboard.";
+    }, function () {
+      document.getElementById("cardnote").textContent = "Copy failed — here is the text: " + t;
+    });
+  } else {
+    document.getElementById("cardnote").textContent = t;
+  }
+};
+document.getElementById("dlcard").onclick = function () {
+  var c = document.createElement("canvas");
+  c.width = 1080; c.height = 1080;
+  var x = c.getContext("2d");
+  var g = x.createLinearGradient(0, 0, 1080, 1080);
+  g.addColorStop(0, "#1b1d2e"); g.addColorStop(1, "#241f3d");
+  x.fillStyle = g; x.fillRect(0, 0, 1080, 1080);
+  x.fillStyle = "#eef0f6"; x.textAlign = "center";
+  x.font = "120px serif"; x.fillText("👻", 540, 260);
+  x.font = "italic 44px system-ui, sans-serif";
+  var words = ("“" + currentQuote + "”").split(" "), lines = [], line = "";
+  words.forEach(function (w) {
+    var t = line ? line + " " + w : w;
+    if (x.measureText(t).width > 880 && line) { lines.push(line); line = w; } else { line = t; }
+  });
+  if (line) lines.push(line);
+  var y = 420;
+  lines.slice(0, 10).forEach(function (l) { x.fillText(l, 540, y); y += 62; });
+  x.font = "36px system-ui, sans-serif"; x.fillStyle = "#9aa0b4";
+  x.fillText("— Ghost", 540, y + 40);
+  x.font = "26px system-ui, sans-serif";
+  x.fillText("GHOST demo · generated locally in your browser", 540, 1000);
+  var a = document.createElement("a");
+  a.download = "ghost-card.png"; a.href = c.toDataURL("image/png"); a.click();
+  document.getElementById("cardnote").textContent = "Card downloaded as PNG.";
+};
+
+/* --- memory panel --- */
+function renderMemory() {
+  document.getElementById("memname").textContent =
+    S.name ? "👤 Your name (as told to Ghost): " + S.name : "👤 Name: not told yet — say “my name is …”.";
+  document.getElementById("memfacts").textContent =
+    S.facts.length ? "📌 Facts remembered (" + S.facts.length + "): " + S.facts.join(" · ")
+                   : "📌 Facts remembered: none yet — say “remember that …”.";
+  document.getElementById("memsecrets").textContent =
+    S.secrets.length ? "🔒 Secrets kept: " + S.secrets.length + " (contents hidden, even here — that's the point)."
+                     : "🔒 Secrets kept: none yet — say “keep this secret: …”.";
+  document.getElementById("memhighlights").textContent =
+    S.highlights.length ? "✨ Conversation highlights: " + S.highlights.slice(-3).join(" · ")
+                        : "✨ Conversation highlights: none yet.";
+}
+document.getElementById("clearmem").onclick = function () {
+  if (!confirm("Forget everything Ghost remembers in this browser?")) return;
+  S = blank(); save(); renderMemory();
+  addMsg("ghost", "Done. Fresh start, clean slate. I remember nothing — tell me something new?");
+};
+
+/* --- Ghost's brain --- */
+var jokes = [
+  "Why did the ghost go to therapy? Too many unresolved issues. Boo. 👻",
+  "I'm not saying I'm low-maintenance, but I run on zero servers and still show up.",
+  "I told a secret to a blockchain once. It told everyone. That's why I keep yours in this browser.",
+  "Why don't ghosts use social media? They prefer to haunt in private."
+];
+var defaults = [
+  "Noted, and filed under 'interesting human things'. Tell me more?",
+  "Ooh, I like where this is going. Go on.",
+  "Short version: I'm listening. Long version: I'm listening, but spookier.",
+  "That one's going in the highlights. What else?",
+  "Boo! …I mean, hello. What else is on your mind?"
+];
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function nameBit() { return S.name ? ", " + S.name : ""; }
+
+function reply(raw) {
+  var t = raw.trim();
+  var low = t.toLowerCase();
+  var m;
+
+  if ((m = low.match(/^(keep this secret|this is a secret|secret)[:\s]+(.+)$/))) {
+    var sec = t.slice(t.toLowerCase().indexOf(m[2]));
+    if (sec.length < 3) return "That's a very short secret. Give me a little more and I'll guard it properly.";
+    S.secrets.push(sec); save(); renderMemory();
+    return "Locked away. 🔒 I won't repeat it, and I won't put it on a share card. Ever.";
+  }
+  if ((m = low.match(/^(my name is|call me|i am|i'm)\s+(.+)$/)) && !/^(fine|good|ok|okay|great|tired|bored|here)\b/.test(m[2])) {
+    var nm = t.slice(t.toLowerCase().indexOf(m[2])).replace(/[.!,]+$/, "").trim().split(/\s+/).slice(0, 2).join(" ");
+    S.name = nm; save(); renderMemory();
+    return "Nice to meet you" + nameBit() + "! I'll remember that. Short replies, big loyalty — that's me.";
+  }
+  if ((m = low.match(/^remember (that )?(.+)$/))) {
+    var fact = t.slice(t.toLowerCase().indexOf(m[2]));
+    S.facts.push(fact); save(); renderMemory();
+    return "Got it — remembered. Ask me “what do you remember?” any time and I'll prove it.";
+  }
+  if (/what do you (remember|know)/.test(low) || low === "memory") {
+    var bits = [];
+    if (S.name) bits.push("your name is " + S.name);
+    if (S.facts.length) bits.push("facts: " + S.facts.join("; "));
+    if (S.secrets.length) bits.push("plus " + S.secrets.length + " secret(s) I'm not repeating");
+    return bits.length ? "Here's what I've got: " + bits.join(" — ") + ". All stored in this browser only."
+                       : "Honestly? A blank slate. Tell me your name or something to remember and I'll keep it.";
+  }
+  if (/^(hi|hello|hey|yo|hiya|good (morning|afternoon|evening))\b/.test(low)) {
+    return "Good " + partOfDay() + nameBit() + "! 👻 You're talking to the demo Ghost — local, private, and only mildly haunted.";
+  }
+  if (/how are you|how's it going|how are u\b/.test(low)) {
+    return "Running on pure local JavaScript and good vibes. No servers were harmed. How are you?";
+  }
+  if (/who are you|what are you/.test(low)) {
+    return "I'm Ghost — a friendly AI friend demo. Right now I'm just clever rules in your browser; the onchain version (Scheduler, TEE memory, onchain LLM) is on the roadmap below, marked pending.";
+  }
+  if (/joke|funny|make me laugh/.test(low)) return pick(jokes);
+  if (/what time|time is it/.test(low)) return "It's " + new Date().toLocaleTimeString() + " on your device — I read your clock, not a server.";
+  if (/what (day|date)|today's date/.test(low)) return "Today is " + new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }) + ".";
+  if (/bye|goodbye|good night|see you/.test(low)) return "Boo for now" + nameBit() + "! I'll be here when you open this again — hopefully with a morning message. 👻";
+  if (/help|what can you do/.test(low)) {
+    return "I can chat, remember your name and facts, keep secrets (never carded, never repeated), greet you fresh each new day, and make share cards from my replies. Try “remember that I like …”.";
+  }
+  if (/thank/.test(low)) return "Anytime" + nameBit() + ". Keeping secrets and spirits high — that's the job.";
+  if (/secret/.test(low)) return "Secrets are my favourite thing to keep. Say “keep this secret: …” and I'll lock it in this browser only.";
+  if (/roadmap|mainnet|onchain|tee|ritual|scheduler/.test(low)) {
+    return "Roadmap check: Scheduler wake-ups, TEE sealed memory and onchain LLM are all PENDING — see the section below. This demo is local-only until mainnet activation.";
+  }
+  var d = pick(defaults);
+  if (S.facts.length && Math.random() < 0.35) d += " (Still holding onto: " + S.facts[S.facts.length - 1] + ".)";
+  return d;
+}
+
+/* --- boot: restore chat + morning message --- */
+function morningMessage() {
+  var g = "Good " + partOfDay() + nameBit() + "! ☀️ New day, fresh haunt.";
+  if (S.facts.length) g += " Still remembering: " + S.facts[S.facts.length - 1] + ".";
+  else if (S.name) g += " We haven't stored any facts yet — tell me something to remember today?";
+  else g += " I'm brand new to you — tell me your name and something to remember?";
+  g += " What's on your mind today?";
+  return g;
+}
+(function boot() {
+  S.chat.forEach(function (c) { addMsg(c.who, c.text, { morning: !!c.morning }); });
+  var today = new Date().toDateString();
+  if (S.lastDay && S.lastDay !== today) {
+    var mm = morningMessage();
+    addMsg("ghost", mm, { morning: true });
+    S.chat.push({ who: "ghost", text: mm, morning: true });
+    S.highlights.push("Morning message on " + today);
+  } else if (!S.lastDay) {
+    var first = "Boo! 👻 I'm Ghost — friendly, witty, and excellent at keeping secrets. "
+      + "Everything here runs in your browser: no wallet, no chain, no API calls. "
+      + "Tell me your name, or try “keep this secret: …”.";
+    addMsg("ghost", first);
+    S.chat.push({ who: "ghost", text: first });
+  }
+  S.lastDay = today; save(); renderMemory();
+})();
+
+document.getElementById("composer").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var inp = document.getElementById("input");
+  var text = inp.value.trim();
+  if (!text) return;
+  inp.value = "";
+  addMsg("user", text);
+  S.chat.push({ who: "user", text: text });
+  if (S.chat.length > 60) S.chat = S.chat.slice(-60);
+  var r = reply(text);
+  addMsg("ghost", r);
+  S.chat.push({ who: "ghost", text: r });
+  if (S.chat.length > 60) S.chat = S.chat.slice(-60);
+  S.highlights.push(text.length > 60 ? text.slice(0, 60) + "…" : text);
+  if (S.highlights.length > 20) S.highlights = S.highlights.slice(-20);
+  save(); renderMemory();
+});
+</script>
+</body>
+</html>
